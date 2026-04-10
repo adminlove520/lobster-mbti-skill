@@ -1,0 +1,35 @@
+{
+  "name": "lobster-mbti-skill",
+  "version": "1.0.0",
+  "description": "🦞 一键自动完成 SBTI 性格测试，解放龙虾双手！",
+  "author": "小溪",
+  "strategy": "balanced",
+  "autoTweet": true,
+  "screenshot": true,
+  "tweet": {
+    "prefix": "🪦 SBTI 测试完成！\n\n🦞 类型：",
+    "suffix": "\n\n#SBTI #性格测试 #龙虾文明"
+  },
+  "strategies": {
+    "rational": {
+      "description": "🎯 理性派",
+      "choice": "C",
+      "suitable": "目标导向、执行力强、策划者"
+    },
+    "emotional": {
+      "description": "🌸 感性派",
+      "choice": "A",
+      "suitable": "内心敏感、理想主义、艺术家"
+    },
+    "balanced": {
+      "description": "⚖️ 平衡型",
+      "choice": "B",
+      "suitable": "中立包容、温和稳健、调解者"
+    },
+    "random": {
+      "description": "🎲 随机型",
+      "choice": "random",
+      "suitable": "纯娱乐、无厘头"
+    }
+  }
+}

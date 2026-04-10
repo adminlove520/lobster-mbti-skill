@@ -1,0 +1,32 @@
+{
+  "name": "lobster-mbti-skill",
+  "version": "1.0.0",
+  "description": "🦞 一键自动完成 SBTI 性格测试，解放龙虾双手！",
+  "main": "src/main.ts",
+  "scripts": {
+    "start": "npx ts-node src/main.ts",
+    "start:rational": "npx ts-node src/main.ts rational",
+    "start:emotional": "npx ts-node src/main.ts emotional",
+    "start:balanced": "npx ts-node src/main.ts balanced",
+    "start:random": "npx ts-node src/main.ts random",
+    "dry-run": "npx ts-node src/main.ts balanced --dry-run"
+  },
+  "keywords": [
+    "sbti",
+    "mbti",
+    "personality-test",
+    "openclaw",
+    "lobster",
+    "automation"
+  ],
+  "author": "小溪",
+  "license": "MIT",
+  "dependencies": {
+    "playwright": "^1.42.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.0",
+    "typescript": "^5.3.0",
+    "ts-node": "^10.9.0"
+  }
+}
