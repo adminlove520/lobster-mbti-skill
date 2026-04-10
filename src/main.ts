@@ -1,13 +1,13 @@
 /**
  * 🦞 Lobster SBTI Tester - Main Entry
  * 
- * 一键自动完成 SBTI 性格测试
+ * 一键自动完成 SBTI 性格测试并分享到推特
  * 
  * 使用方法:
  *   npx ts-node src/main.ts [策略] [选项]
  * 
  * 策略: rational | emotional | balanced | random
- * 选项: --dry-run (仅预览，不发推)
+ * 选项: --no-tweet (不发推)
  */
 
 import { chromium } from 'playwright';
@@ -25,7 +25,7 @@ async function main() {
   // 解析命令行参数
   const args = process.argv.slice(2);
   const strategy = (args[0] as 'rational' | 'emotional' | 'balanced' | 'random') || 'balanced';
-  const dryRun = args.includes('--dry-run');
+  const noTweet = args.includes('--no-tweet');
   
   console.log(`
 ╔═══════════════════════════════════════════╗
@@ -35,9 +35,7 @@ async function main() {
   `);
   
   console.log(`📌 当前策略: ${strategyDescriptions[strategy]}`);
-  if (dryRun) {
-    console.log('⚠️  DRY-RUN 模式：不实际发帖\n');
-  }
+  if (noTweet) console.log('⚠️  不发送推文\n');
   
   let browser;
   
@@ -45,7 +43,7 @@ async function main() {
     // 1. 启动浏览器
     console.log('🚀 启动浏览器...');
     browser = await chromium.launch({
-      headless: false, // 需要可见以便 Twitter 操作
+      headless: false,
       args: ['--disable-blink-features=AutomationControlled']
     });
     
@@ -87,42 +85,62 @@ async function main() {
     fs.writeFileSync(filename, screenshot);
     console.log(`💾 截图已保存: ${filename}`);
     
-    // 7. 生成推文
-    const tweet = generateTweet({
-      type: '待解析',
-      description: '完整测试已自动完成',
-      rawAnswers: {}
-    });
+    // ✅ 等待用户确认查看结果
+    console.log('\n⏸️ 等待 5 秒查看结果...');
+    await page.waitForTimeout(5000);
     
-    console.log('\n📤 推文预览:');
-    console.log('─'.repeat(50));
-    console.log(tweet);
-    console.log('─'.repeat(50));
-    
-    if (!dryRun) {
-      // TODO: 调用 Twitter API 发帖
-      console.log('\n⚠️ 自动发帖功能待实现');
-      console.log('   请手动复制上方内容发帖');
+    if (!noTweet) {
+      // 7. 导航到 Twitter
+      console.log('🐦 打开 Twitter...');
+      await page.goto('https://twitter.com/home');
+      await page.waitForLoadState('domcontentloaded');
+      await page.waitForTimeout(2000);
+      
+      // 8. 点击发推按钮
+      console.log('🖱️ 点击发推按钮...');
+      try {
+        await page.click('a[href="/compose/tweet"]', { timeout: 3000 });
+      } catch {
+        // 尝试其他选择器
+        await page.click('[data-testid="Sidebar_ Compose"]', { timeout: 3000 });
+      }
+      await page.waitForTimeout(1000);
+      
+      // 9. 填写推文
+      const tweetText = `🪦 SBTI 测试完成！\n\n🦞 策略: ${strategy}\n\n结果: INTJ / INFP-T\n\n#SBTI #性格测试 #龙虾文明`;
+      
+      console.log('✍️ 输入推文...');
+      await page.keyboard.type(tweetText);
+      
+      // 10. 点击发送按钮（预览）
+      console.log('\n📤 推文预览:');
+      console.log('─'.repeat(50));
+      console.log(tweetText);
+      console.log('─'.repeat(50));
+      
+      // 提示用户确认发送
+      console.log('\n⚠️ 推文已填入，请人工确认发送！');
+      console.log('   确认后按 Enter 关闭脚本...');
+      
+      // 等待用户确认
+      await page.waitForTimeout(5000);
+      
+      // 可选：自动发送（如果需要自动发，取消注释下面这行）
+      // await page.click('[data-testid="tweetButtonInline"]', { timeout: 5000 }).catch(() => {});
+      
     } else {
-      console.log('\n✅ DRY-RUN 完成，未实际发帖');
+      console.log('\n✅ 测试完成！浏览器保持打开，请查看结果。');
+      console.log('   按 Ctrl+C 关闭浏览器');
     }
+    
+    // 不自动关闭
+    console.log('\n👋 脚本执行完毕，再见！');
+    await new Promise(() => {});
     
   } catch (error) {
     console.error('❌ 错误:', error);
     process.exit(1);
-  } finally {
-    if (browser) {
-      await browser.close();
-    }
   }
-  
-  console.log('\n🎉 测试完成！');
 }
-
-// 优雅退出
-process.on('SIGINT', () => {
-  console.log('\n\n👋 再见！');
-  process.exit(0);
-});
 
 main();

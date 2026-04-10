@@ -1,9 +1,9 @@
 /**
  * SBTI Browser 自动化
- * 通过 CDP (Chrome DevTools Protocol) 自动完成测试
+ * 通过 Playwright 自动完成测试
  */
 
-import type { Browser, Page } from 'playwright';
+import type { Page, Browser } from 'playwright';
 
 export interface BrowserDriver {
   page: Page;
@@ -37,46 +37,7 @@ export async function getProgress(driver: BrowserDriver): Promise<string> {
 }
 
 /**
- * 获取所有题目的选项 refs
- */
-export async function getAllOptions(driver: BrowserDriver): Promise<{
-  questionId: number;
-  options: { ref: string; label: 'A' | 'B' | 'C' }[];
-}[]> {
-  const snapshot = await driver.page.evaluate(() => {
-    const radios = Array.from(document.querySelectorAll('input[type="radio"]'));
-    const result: { ref: string; label: string }[] = [];
-    
-    radios.forEach((radio, index) => {
-      const id = radio.getAttribute('id') || '';
-      result.push({ ref: id, label: String.fromCharCode(65 + (index % 3)) }); // A, B, or C
-    });
-    
-    return result;
-  });
-  
-  // 按题目分组
-  const questions: {
-    questionId: number;
-    options: { ref: string; label: 'A' | 'B' | 'C' }[];
-  }[] = [];
-  
-  for (let i = 0; i < snapshot.length; i += 3) {
-    questions.push({
-      questionId: Math.floor(i / 3) + 1,
-      options: [
-        { ref: snapshot[i].ref, label: 'A' },
-        { ref: '[object Object]', label: 'B' },
-        { ref: '[object Object]', label: 'C' }
-      ]
-    });
-  }
-  
-  return questions;
-}
-
-/**
- * 答题策略类型
+ * 策略类型
  */
 type Strategy = 'rational' | 'emotional' | 'balanced' | 'random';
 
@@ -103,6 +64,15 @@ function chooseByStrategy(strategy: Strategy, questionIndex: number): 'A' | 'B' 
       return 'B';
   }
 }
+
+/**
+ * 答题选项文字映射
+ */
+const optionLabels: Record<string, string[]> = {
+  A: ['不认同', '并没有', '这种情况较少'],
+  B: ['中立', '也许', '看情况'],
+  C: ['认同', '是的', '喜欢']
+};
 
 /**
  * 自动完成所有题目
@@ -134,33 +104,44 @@ export async function answerAllQuestions(
       // 获取当前题目的选项
       const choice = chooseByStrategy(strategy, q - 1);
       
-      // 点击对应选项 (A/B/C)
-      const optionIndex = { A: 0, B: 1, C: 2 }[choice];
+      // 点击对应选项 - 使用 Playwright locator
+      // 找包含选项文字的 radio 并点击
+      const choiceTexts = optionLabels[choice];
       
-      // 找到所有未选的 radio buttons for current question
-      const radios = await driver.page.locator('input[type="radio"]').all();
-      
-      // 计算当前题目的选项索引
-      // 每道题 3 个选项，按题目顺序排列
-      const questionStartIndex = (q - 1) * 3;
-      const targetIndex = questionStartIndex + optionIndex;
-      
-      if (radios[targetIndex]) {
-        await radios[targetIndex].click({ force: true });
-        answered++;
-        console.log(`Q${q}: 选择 ${choice}`);
-      } else {
-        // fallback: 尝试模糊匹配
-        const label = choice === 'A' ? '不认同' : choice === 'B' ? '中立' : '认同';
-        const clicked = await driver.page.locator(`input[type="radio"]`).filter({ hasText: new RegExp(`^${label}`) }).first().click({ force: true }).then(() => true).catch(() => false);
-        
-        if (clicked) {
-          answered++;
-          console.log(`Q${q}: 选择 ${choice} (fallback)`);
-        } else {
-          errors++;
-          console.log(`Q${q}: 点击失败`);
+      let clicked = false;
+      for (const text of choiceTexts) {
+        try {
+          const locator = driver.page.locator(`input[type="radio"]`, { hasText: text }).first();
+          if (await locator.isVisible({ timeout: 500 }).catch(() => false)) {
+            await locator.click({ force: true });
+            clicked = true;
+            console.log(`Q${q}: 选择 ${choice} (${text})`);
+            break;
+          }
+        } catch {
+          // 尝试下一个
         }
+      }
+      
+      // Fallback: 直接点击第 N 个 radio
+      if (!clicked) {
+        const optionIndex = { A: 0, B: 1, C: 2 }[choice];
+        const questionStartIndex = (q - 1) * 3;
+        const targetIndex = questionStartIndex + optionIndex;
+        
+        const radios = await driver.page.locator('input[type="radio"]').all();
+        if (radios[targetIndex]) {
+          await radios[targetIndex].click({ force: true });
+          clicked = true;
+          console.log(`Q${q}: 选择 ${choice} (fallback index ${targetIndex})`);
+        }
+      }
+      
+      if (clicked) {
+        answered++;
+      } else {
+        errors++;
+        console.log(`Q${q}: 点击失败`);
       }
       
       await driver.page.waitForTimeout(100);
@@ -188,5 +169,5 @@ export async function submitTest(driver: BrowserDriver): Promise<void> {
  * 截图结果页
  */
 export async function screenshotResult(driver: BrowserDriver): Promise<Buffer> {
-  return await driver.page.screenshot({ fullPage: true }) as Buffer;
+  return (await driver.page.screenshot({ fullPage: true })) as Buffer;
 }
